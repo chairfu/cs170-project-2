@@ -4,6 +4,7 @@
 #include <vector>
 #include <set>
 #include <limits>
+#include <cmath>
 using namespace std;
 
 //did not write this
@@ -34,26 +35,25 @@ double accuracy (const vector<vector<double>>& data, int currFeature, const set<
 
     for (int i = 0; i < data.size(); i++) {
 
-        vector<double> currObject = data[i];
-        int nnDist = DBL_MAX;
-        int nnIndex = DBL_MAX;
+        double nnDist = DBL_MAX;
+        int nnIndex = -1;
 
         for (int j = 0; j < data.size(); j++) {
+
+            if (j == i) {continue;}
 
             double dist = 0;
 
             if (!featureSet.empty()){
                 for (int feature : featureSet) {
-                    cout << "current feature: " << feature << endl;
+                    //cout << "current feature: " << feature << endl;
                     double diff = data[j][feature] - data[i][feature];
                     dist += diff * diff;
                 }
             }
 
-            int diff = data[j][currFeature] - data[i][currFeature];
+            double diff = data[j][currFeature] - data[i][currFeature];
             dist += diff * diff;
-
-            dist = sqrt(dist);
 
             if (nnDist > dist) {
                 nnDist = dist;
@@ -68,9 +68,7 @@ double accuracy (const vector<vector<double>>& data, int currFeature, const set<
 
     }
 
-    cout << correct / data.size() << endl;
-
-    return (correct / data.size());
+    return double(correct / data.size());
 
 }
 
@@ -91,29 +89,36 @@ set<int> forward_search(const vector<vector<double>>& data) {
             cout << endl;
         }
 
-        int maxAcc = 0;
-        int maxAccIndex = INT_MAX;
+        double maxAcc = 0.0;
+        int maxAccIndex = -1;
         for (int j = 1; j < data[0].size(); j++) {
-            if (j == i) {continue;}
+            if (featureSet.count(j)) continue;
 
             cout << "Testing accuracy with feature: " << j << endl;
 
-            int currAcc = accuracy(data, j, featureSet);
+            double currAcc = accuracy(data, j, featureSet);
             cout << currAcc << endl;
 
             if (currAcc > maxAcc) {
+                cout << "here" << endl;
                 maxAcc = currAcc;
                 maxAccIndex = j;
             }
 
         }
 
-        cout << "Adding feature " << maxAccIndex << " , which gave an accuracy of " << maxAcc << "%" << endl;
+        cout << "Adding feature " << maxAccIndex << " , which gave an accuracy of " << maxAcc  * 100.0 << "%" << endl;
         featureSet.insert(maxAccIndex);
 
     }
 
     return featureSet;
+
+}
+
+set<int> backward_elimination(const vector<vector<double>>& data) {
+
+    //nothing here yet
 
 }
 
@@ -127,6 +132,9 @@ int main () {
     string fileName;
     if (fileNum == 1) {
         fileName = "SanityCheck_DataSet__1.txt";
+    }
+    else if (fileNum == 2) {
+        fileName = "SanityCheck_DataSet__2.txt";
     }
 
     vector<vector<double>> data;
