@@ -29,7 +29,7 @@ vector<vector<double>> readDataset(const string& filename) {
     return data;
 }
 
-double accuracy (const vector<vector<double>>& data, int currFeature, const set<int>& featureSet) {
+double accuracy(const vector<vector<double>>& data, int currFeature, const set<int>& featureSet) {
 
     double correct = 0.0;
 
@@ -46,14 +46,15 @@ double accuracy (const vector<vector<double>>& data, int currFeature, const set<
 
             if (!featureSet.empty()){
                 for (int feature : featureSet) {
-                    //cout << "current feature: " << feature << endl;
                     double diff = data[j][feature] - data[i][feature];
                     dist += diff * diff;
                 }
             }
 
-            double diff = data[j][currFeature] - data[i][currFeature];
-            dist += diff * diff;
+            if (j > 0) {
+                double diff = data[j][currFeature] - data[i][currFeature];
+                dist += diff * diff;
+            }
 
             if (nnDist > dist) {
                 nnDist = dist;
@@ -68,15 +69,14 @@ double accuracy (const vector<vector<double>>& data, int currFeature, const set<
 
     }
 
+    //cout << double(correct / data.size()) * 100 << "%" << endl;
     return double(correct / data.size());
 
 }
 
-set<int> forward_search(const vector<vector<double>>& data) {
+void forwardSearch(const vector<vector<double>>& data) {
 
     set<int> featureSet;
-
-    cout << data[0].size() << endl;
 
     for (int i = 1; i < data[0].size(); i++) {
 
@@ -94,31 +94,69 @@ set<int> forward_search(const vector<vector<double>>& data) {
         for (int j = 1; j < data[0].size(); j++) {
             if (featureSet.count(j)) continue;
 
-            cout << "Testing accuracy with feature: " << j << endl;
+            //cout << "Testing accuracy with feature: " << j << endl;
 
             double currAcc = accuracy(data, j, featureSet);
-            cout << currAcc << endl;
 
             if (currAcc > maxAcc) {
-                cout << "here" << endl;
+                //cout << "here" << endl;
                 maxAcc = currAcc;
                 maxAccIndex = j;
             }
 
         }
 
-        cout << "Adding feature " << maxAccIndex << " , which gave an accuracy of " << maxAcc  * 100.0 << "%" << endl;
+        cout << "Adding feature " << maxAccIndex << ", which gave an accuracy of " << maxAcc  * 100.0 << "%" << endl;
         featureSet.insert(maxAccIndex);
 
     }
 
-    return featureSet;
-
 }
 
-set<int> backward_elimination(const vector<vector<double>>& data) {
+void backwardElimination(const vector<vector<double>>& data) {
 
-    //nothing here yet
+    set<int> featureSet;
+
+    for (int i = 1; i < data[0].size(); i++) {
+        featureSet.insert(i);
+    }
+
+    for (int i = 1; i < data[0].size() - 1; i++) {
+
+        if (!featureSet.empty()) {
+            cout << "Current feature set: ";
+            for (int feature : featureSet) {
+                cout << feature << " ";
+            }
+
+            cout << endl;
+        }
+
+        double maxAcc = 0.0;
+        int maxAccIndex = -1;
+        for (int j = 1; j < data[0].size(); j++) {
+            if (!featureSet.count(j)) continue;
+
+            //cout << "Testing accuracy without feature: " << j << endl;
+
+            set<int> tempSet = featureSet;
+            tempSet.erase(j);
+
+            double tempSetAcc = accuracy(data, -1, tempSet);
+
+            if (tempSetAcc > maxAcc) {
+                maxAcc = tempSetAcc;
+                maxAccIndex = j;
+            }
+
+        }
+
+        featureSet.erase(maxAccIndex);
+        double newAcc = accuracy(data, -1, featureSet);
+
+        cout << "Removing feature " << maxAccIndex << ", accuracy of set is now " << newAcc  * 100.0 << "%" << endl;
+
+    }
 
 }
 
@@ -136,11 +174,26 @@ int main () {
     else if (fileNum == 2) {
         fileName = "SanityCheck_DataSet__2.txt";
     }
+    else if (fileNum == 3) {
+        fileName = "CS170_Small_DataSet__110.txt";
+    }
+    else if (fileNum == 4) {
+        fileName = "CS170_Large_DataSet__62.txt";
+    }
 
     vector<vector<double>> data;
     data = readDataset(fileName);
 
-    set<int> finalFeatures = forward_search(data);
+    cout << "Which method would you like to use? 1 for forward search, 2 for backward elimination" << endl;
 
+    int method;
+    cin >> method;
+
+    if (method == 1) {
+        forwardSearch(data);
+    }
+    else if (method == 2) {
+        backwardElimination(data);
+    }
 
 }
