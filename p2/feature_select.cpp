@@ -29,9 +29,34 @@ vector<vector<double>> readDataset(const string& filename) {
     return data;
 }
 
-double accuracy(const vector<vector<double>>& data, int currFeature, const set<int>& featureSet) {
+vector<vector<vector<double>>> cacheInit (const vector<vector<double>>& data) {
+
+    //for each feature (data[0].size), store distance from one point i to every other point j 
+    //layers of cache: feature, point i, point j
+    vector<vector<vector<double>>> cache(data[0].size(), vector<vector<double>>(data.size(), vector<double>(data.size())));
+
+    for (int feature = 1; feature < data[0].size(); ++feature) {
+        for (int i = 0; i < data.size(); i++) {
+            for (int j = 0; j < data.size(); j++) {
+                
+                double diff = data[i][feature] - data[j][feature];
+                double dist = diff * diff;
+
+                cache[feature][i][j] = dist;
+
+            }
+        }
+    }
+
+    return cache;
+
+}
+
+double accuracy(const vector<vector<double>>& data, const vector<vector<vector<double>>>& cache, int currFeature, const set<int>& featureSet, const double bestSoFar) {
 
     double correct = 0.0;
+    double incorrect = 0.0;
+    double incorrectThresh = data.size() - (data.size() * bestSoFar);
 
     for (int i = 0; i < data.size(); i++) {
 
@@ -46,14 +71,12 @@ double accuracy(const vector<vector<double>>& data, int currFeature, const set<i
 
             if (!featureSet.empty()){
                 for (int feature : featureSet) {
-                    double diff = data[j][feature] - data[i][feature];
-                    dist += diff * diff;
+                    dist += cache[feature][i][j];
                 }
             }
 
-            if (j > 0) {
-                double diff = data[j][currFeature] - data[i][currFeature];
-                dist += diff * diff;
+            if (currFeature > -1) {
+                dist += cache[currFeature][i][j];
             }
 
             if (nnDist > dist) {
@@ -62,9 +85,16 @@ double accuracy(const vector<vector<double>>& data, int currFeature, const set<i
             }
 
         }
-
+        
         if (data[nnIndex][0] == data[i][0]) {
             correct++;
+        }
+        else {
+            incorrect++;
+        }
+
+        if (incorrect >= incorrectThresh) {
+            return double(correct / data.size());
         }
 
     }
@@ -74,7 +104,7 @@ double accuracy(const vector<vector<double>>& data, int currFeature, const set<i
 
 }
 
-void forwardSearch(const vector<vector<double>>& data) {
+void forwardSearch(const vector<vector<double>>& data, const vector<vector<vector<double>>>& cache) {
 
     set<int> featureSet;
 
@@ -96,7 +126,7 @@ void forwardSearch(const vector<vector<double>>& data) {
 
             //cout << "Testing accuracy with feature: " << j << endl;
 
-            double currAcc = accuracy(data, j, featureSet);
+            double currAcc = accuracy(data, cache, j, featureSet, maxAcc);
 
             if (currAcc > maxAcc) {
                 //cout << "here" << endl;
@@ -113,7 +143,7 @@ void forwardSearch(const vector<vector<double>>& data) {
 
 }
 
-void backwardElimination(const vector<vector<double>>& data) {
+void backwardElimination(const vector<vector<double>>& data, const vector<vector<vector<double>>>& cache) {
 
     set<int> featureSet;
 
@@ -134,15 +164,14 @@ void backwardElimination(const vector<vector<double>>& data) {
 
         double maxAcc = 0.0;
         int maxAccIndex = -1;
-        for (int j = 1; j < data[0].size(); j++) {
-            if (!featureSet.count(j)) continue;
 
-            //cout << "Testing accuracy without feature: " << j << endl;
+        vector<int> potential(featureSet.begin(), featureSet.end());
 
-            set<int> tempSet = featureSet;
-            tempSet.erase(j);
+        for (int j : potential) {
 
-            double tempSetAcc = accuracy(data, -1, tempSet);
+            featureSet.erase(j);
+            double tempSetAcc = accuracy(data, cache, -1, featureSet, maxAcc);
+            featureSet.insert(j);
 
             if (tempSetAcc > maxAcc) {
                 maxAcc = tempSetAcc;
@@ -152,9 +181,8 @@ void backwardElimination(const vector<vector<double>>& data) {
         }
 
         featureSet.erase(maxAccIndex);
-        double newAcc = accuracy(data, -1, featureSet);
 
-        cout << "Removing feature " << maxAccIndex << ", accuracy of set is now " << newAcc  * 100.0 << "%" << endl;
+        cout << "Removing feature " << maxAccIndex << ", accuracy of set is now " << maxAcc  * 100.0 << "%" << endl;
 
     }
 
@@ -189,11 +217,17 @@ int main () {
     int method;
     cin >> method;
 
+    cout << "Initializing cache..." << endl;
+    vector<vector<vector<double>>> cache = cacheInit(data);
+
+    cout << "Cache done. Beginning feature selection" << endl;
+
     if (method == 1) {
-        forwardSearch(data);
+        forwardSearch(data, cache);
     }
     else if (method == 2) {
-        backwardElimination(data);
+        backwardElimination(data, cache);
     }
+
 
 }
