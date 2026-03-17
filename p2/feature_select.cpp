@@ -5,9 +5,12 @@
 #include <set>
 #include <limits>
 #include <cmath>
+#include <chrono>
+using namespace std::chrono;
 using namespace std;
 
-//did not write this
+//Code here is adapted from this thread:
+//https://stackoverflow.com/questions/64571919/c-readfile-with-varying-element-amounts-per-line#:~:text=%3E%20filename;%20readFile.-,open(filename);%20if%20(!readFile)%20%7B%20std::cout,28%2C%202020%20at%2011:45
 vector<vector<double>> readDataset(const string& filename) {
     ifstream file(filename);
     vector<vector<double>> data;
@@ -27,6 +30,19 @@ vector<vector<double>> readDataset(const string& filename) {
     }
 
     return data;
+}
+
+void printSet (const set<int>& featureSet) {
+
+    vector<int> toPrint(featureSet.begin(), featureSet.end());
+
+    cout << "{";
+    for (int i = 0; i < toPrint.size(); i++) {
+        cout << toPrint[i];
+        if (i != toPrint.size() - 1) {cout << ", ";}
+    }
+    cout << "}";
+
 }
 
 vector<vector<vector<double>>> cacheInit (const vector<vector<double>>& data) {
@@ -52,6 +68,25 @@ vector<vector<vector<double>>> cacheInit (const vector<vector<double>>& data) {
 
 }
 
+double defaultRate(const vector<vector<double>>& data) {
+
+    //implementation for the default rate as given on Machine Learning 002 slides
+    double c1 = 0.0;
+    double c2 = 0.0;
+
+    for (int i = 0; i < data.size(); i++) {
+
+        if (data[i][0] == 1.0000000e+00) {c1++;}
+        if (data[i][0] == 2.0000000e+00) {c2++;}
+
+    }
+
+    double defaultRate = (c1 > c2) ? c1 / double(data.size()) : c2 / double(data.size());
+
+    return defaultRate;
+
+}
+
 double accuracy(const vector<vector<double>>& data, const vector<vector<vector<double>>>& cache, int currFeature, const set<int>& featureSet, const double bestSoFar) {
 
     int rows = data.size();
@@ -60,6 +95,7 @@ double accuracy(const vector<vector<double>>& data, const vector<vector<vector<d
     double incorrect = 0.0;
     double incorrectThresh = rows - (rows * bestSoFar);
 
+    //iterating through a vector is faster. I was trying anything at this point :,)
     vector<int> featureVec (featureSet.begin(), featureSet.end());
 
     for (int i = 0; i < rows; i++) {
@@ -75,6 +111,7 @@ double accuracy(const vector<vector<double>>& data, const vector<vector<vector<d
 
             for (int feature : featureVec) {
                 dist += cache[feature][i][j];
+                //if distance already exceeds the nearest neighbor's distance, there's no need to continue
                 if (dist > nnDist) {
                     break; 
                 }
@@ -98,53 +135,67 @@ double accuracy(const vector<vector<double>>& data, const vector<vector<vector<d
             incorrect++;
         }
 
+        //if this block gets entered that means that the accuracy is already lower than our best so far, no need to continue computing this feature
         if (incorrect >= incorrectThresh) {
             return double(correct / rows);
         }
 
     }
 
-    //cout << double(correct / data.size()) * 100 << "%" << endl;
     return double(correct / rows);
 
 }
 
-void forwardSearch(const vector<vector<double>>& data, const vector<vector<vector<double>>>& cache) {
+set<int> forwardSearch(const vector<vector<double>>& data, const vector<vector<vector<double>>>& cache) {
 
     set<int> featureSet;
+    set<int> bestSet;
+    double bestSetAcc = 0.0;
 
     for (int i = 1; i < data[0].size(); i++) {
-
-        if (!featureSet.empty()) {
-            cout << "Current feature set: ";
-            for (int feature : featureSet) {
-                cout << feature << " ";
-            }
-
-            cout << endl;
-        }
 
         double maxAcc = 0.0;
         int maxAccIndex = -1;
         for (int j = 1; j < data[0].size(); j++) {
             if (featureSet.count(j)) continue;
 
-            //cout << "Testing accuracy with feature: " << j << endl;
+            cout << "\tUsing feature(s) {";
+            for (int feature : featureSet) {
+                cout << feature << ", ";
+            }
+
+            cout << j << "}";
 
             double currAcc = accuracy(data, cache, j, featureSet, maxAcc);
 
+            cout << " accuracy is " << currAcc * 100 << "%" << endl;
+
             if (currAcc > maxAcc) {
-                //cout << "here" << endl;
                 maxAcc = currAcc;
                 maxAccIndex = j;
             }
 
         }
 
-        cout << "Adding feature " << maxAccIndex << ", which gave an accuracy of " << maxAcc  * 100.0 << "%" << endl;
         featureSet.insert(maxAccIndex);
 
+        cout << "Feature set " ;
+        printSet(featureSet);
+
+        cout << " was best, accuracy is " << maxAcc * 100 << "%" << endl;
+
+        if (maxAcc > bestSetAcc) {
+            bestSet = featureSet;
+            bestSetAcc = maxAcc;
+        }
+
     }
+
+     cout << "Search complete! The best set was: "; 
+     printSet(bestSet);
+     cout << " which has an accuracy of " << bestSetAcc * 100 << "%" << endl;
+
+    return bestSet;
 
 }
 
@@ -213,26 +264,40 @@ int main () {
     else if (fileNum == 4) {
         fileName = "CS170_Large_DataSet__62.txt";
     }
-
-    vector<vector<double>> data;
-    data = readDataset(fileName);
-
     cout << "Which method would you like to use? 1 for forward search, 2 for backward elimination" << endl;
 
     int method;
     cin >> method;
 
-    cout << "Initializing cache..." << endl;
+    vector<vector<double>> data;
+    data = readDataset(fileName);
+
+    cout << "This dataset has " << data[0].size() - 1 << " features (not including the class attribute), with " << data.size() << " instances." << endl;
+
     vector<vector<vector<double>>> cache = cacheInit(data);
 
-    cout << "Cache done. Beginning feature selection" << endl;
+    set<int> featureSet;
 
+    for (int i = 1; i < data[0].size(); i++) {
+        featureSet.insert(i);
+    }
+
+    cout << "Running nearest neighbor with all 4 features, using 'leave-one-out' cross evaluation, I get an accuracy of: " << accuracy(data, cache, -1, featureSet, 0.0) * 100 << "%" << endl;
+    cout << "Beginning search:" << endl;
+
+    //all timing logic came from this website:
+    //https://www.geeksforgeeks.org/cpp/measure-execution-time-function-cpp/
+    auto start = high_resolution_clock::now();
     if (method == 1) {
-        forwardSearch(data, cache);
+        set<int> bestSet = forwardSearch(data, cache);
     }
     else if (method == 2) {
         backwardElimination(data, cache);
     }
+    auto stop = high_resolution_clock::now();
+
+    auto duration = duration_cast<microseconds>(stop - start);
+    cout << duration.count() << endl;
 
 
 }
