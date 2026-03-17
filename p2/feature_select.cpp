@@ -54,28 +54,33 @@ vector<vector<vector<double>>> cacheInit (const vector<vector<double>>& data) {
 
 double accuracy(const vector<vector<double>>& data, const vector<vector<vector<double>>>& cache, int currFeature, const set<int>& featureSet, const double bestSoFar) {
 
+    int rows = data.size();
+
     double correct = 0.0;
     double incorrect = 0.0;
-    double incorrectThresh = data.size() - (data.size() * bestSoFar);
+    double incorrectThresh = rows - (rows * bestSoFar);
 
-    for (int i = 0; i < data.size(); i++) {
+    vector<int> featureVec (featureSet.begin(), featureSet.end());
+
+    for (int i = 0; i < rows; i++) {
 
         double nnDist = DBL_MAX;
         int nnIndex = -1;
 
-        for (int j = 0; j < data.size(); j++) {
+        for (int j = 0; j < rows; j++) {
 
             if (j == i) {continue;}
 
             double dist = 0;
 
-            if (!featureSet.empty()){
-                for (int feature : featureSet) {
-                    dist += cache[feature][i][j];
+            for (int feature : featureVec) {
+                dist += cache[feature][i][j];
+                if (dist > nnDist) {
+                    break; 
                 }
             }
 
-            if (currFeature > -1) {
+            if (dist <= nnDist && currFeature > -1) {
                 dist += cache[currFeature][i][j];
             }
 
@@ -94,13 +99,13 @@ double accuracy(const vector<vector<double>>& data, const vector<vector<vector<d
         }
 
         if (incorrect >= incorrectThresh) {
-            return double(correct / data.size());
+            return double(correct / rows);
         }
 
     }
 
     //cout << double(correct / data.size()) * 100 << "%" << endl;
-    return double(correct / data.size());
+    return double(correct / rows);
 
 }
 
